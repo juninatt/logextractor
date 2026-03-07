@@ -1,0 +1,18 @@
+{
+  "input": {
+    "timestamp_format": "syslog",
+    "encoding": "utf-8"
+  },
+  "output": {
+    "file_path": "output/filtered_log.txt",
+    "include_summary": true,
+    "include_statistics": true,
+    "verbosity": "normal"
+  },
+  "filters": {
+    "rules": []
+  },
+  "statistics": {
+    "enabled": true
+  }
+}
