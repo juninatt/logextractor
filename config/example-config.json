@@ -10,9 +10,17 @@
     "verbosity": "normal"
   },
   "filters": {
-    "rules": []
+    "rules": [],
+    "global_exclude_levels": [],
+    "global_exclude_processes": [],
+    "global_exclude_message_contains": []
   },
   "statistics": {
-    "enabled": true
+    "enabled": true,
+    "count_by_level": true,
+    "count_by_rule": true,
+    "count_by_process": true,
+    "detect_repetitive_messages": true,
+    "top_repetitive_message_limit": 10
   }
 }
