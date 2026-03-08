@@ -1,3 +1,11 @@
+"""
+Run the end-to-end log extraction workflow for a single input file.
+
+This module coordinates configuration loading, log parsing, rule matching,
+and result collection. It acts as the main extraction layer between the CLI
+and the lower-level parsing, filtering, and reporting components.
+"""
+
 from pathlib import Path
 
 from logextractor.config.loader import ConfigLoader
@@ -7,12 +15,17 @@ from logextractor.parsing.log_parser import LogParser
 
 
 class LogExtractor:
-    """Processes a log file and extracts entries matching configured rules."""
+    """
+    Process a log file and collect entries that match configured rules.
+    """
 
     def __init__(self, year: int) -> None:
         self._year = year
 
     def extract(self, input_path: Path, config_path: Path) -> ExtractionResult:
+        """
+        Extract matching log entries from the given input file using the selected profile.
+        """
         config = ConfigLoader.load(config_path)
         parser = LogParser(year=self._year)
 
@@ -20,7 +33,7 @@ class LogExtractor:
         total_lines_parsed = 0
         matched_entries: list[MatchedLogEntry] = []
 
-        with input_path.open("r", encoding=config.input.encoding) as file:
+        with input_path.open("r", encoding=config.input_settings.file_encoding) as file:
             for line in file:
                 total_lines_read += 1
 
@@ -30,14 +43,14 @@ class LogExtractor:
 
                 total_lines_parsed += 1
 
-                if LogMatcher.is_excluded(entry, config.filters):
+                if LogMatcher.is_excluded(entry, config.filtering):
                     continue
 
-                for rule in config.filters.rules:
+                for rule in config.filtering.rules:
                     if LogMatcher.matches_rule(entry, rule):
                         matched_entries.append(
                             MatchedLogEntry(
-                                rule_name=rule.name,
+                                rule_name=rule.rule_name,
                                 entry=entry,
                             )
                         )

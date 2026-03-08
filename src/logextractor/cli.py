@@ -1,13 +1,17 @@
+"""
+Provides the CLI entry point for the logextractor application.
+
+This module parses command-line arguments, loads configuration profiles,
+and runs the log extraction pipeline.
+"""
+
 import argparse
-from datetime import datetime
 from pathlib import Path
 
 from logextractor.config.loader import ConfigLoader
+from logextractor.constants import DEFAULT_CONFIG_DIRECTORY, DEFAULT_CURRENT_YEAR
 from logextractor.extraction.extractor import LogExtractor
 from logextractor.reporting.writer import ResultWriter
-
-
-DEFAULT_CONFIG_DIRECTORY = Path("config")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -31,7 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-y",
         "--year",
         type=int,
-        default=datetime.now().year,
+        default=DEFAULT_CURRENT_YEAR,
         help="Year used when parsing syslog timestamps. Defaults to the current year.",
     )
     return parser
@@ -59,7 +63,7 @@ def main() -> None:
     extractor = LogExtractor(year=args.year)
     result = extractor.extract(input_path=input_path, config_path=config_path)
 
-    output_path = Path(config.output.file_path)
+    output_path = Path(config.output_settings.output_file_path)
     ResultWriter.write(result=result, output_path=output_path)
 
     print(f"Matched entries: {result.total_lines_matched}")

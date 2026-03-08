@@ -1,86 +1,120 @@
+"""
+Define the core domain models used throughout the application.
+
+These dataclasses represent parsed log entries, configuration objects,
+filter rules, and extraction results. They form the internal typed model
+used across the parsing, filtering, extraction, and reporting layers.
+"""
+
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+
+
+@dataclass(frozen=True)
+class ProfileConfig:
+    """
+    Describes a named configuration profile and its intended purpose.
+    """
+
+    name: str
+    description: str
 
 
 @dataclass(frozen=True)
 class LogEntry:
-    """Represents a single parsed log entry."""
+    """
+    Represents a single parsed log entry.
+    """
 
     timestamp: datetime
     level: str
-    process: Optional[str]
-    logger: Optional[str]
+    source: str | None
+    logger: str | None
     message: str
     raw_line: str
 
 
 @dataclass(frozen=True)
 class FilterRule:
-    """Defines a rule used to match log entries."""
+    """
+    Defines one rule used to match relevant log entries.
+    """
 
-    name: str
-    levels: list[str]
-    processes: list[str] | None
-    logger_contains_any: list[str] | None
-    message_contains_any: list[str] | None
-    context_before_seconds: int
-    context_after_seconds: int
+    rule_name: str
+    match_log_levels: list[str]
+    match_sources: list[str] | None
+    match_logger_name_contains: list[str] | None
+    match_message_contains: list[str] | None
+    include_context_before_seconds: int
+    include_context_after_seconds: int
 
 
 @dataclass(frozen=True)
 class InputConfig:
-    """Defines how the input log file should be read."""
+    """
+    Defines how the input log file should be read.
+    """
 
-    timestamp_format: str
-    encoding: str
+    log_timestamp_format: str
+    file_encoding: str
 
 
 @dataclass(frozen=True)
 class OutputConfig:
-    """Defines how extracted results should be written."""
+    """
+    Defines how extracted results should be written.
+    """
 
-    file_path: str
-    include_summary: bool
-    include_statistics: bool
-    verbosity: str
+    output_file_path: str
+    write_run_summary: bool
+    write_statistics: bool
+    output_verbosity_level: str
 
 
 @dataclass(frozen=True)
 class StatisticsConfig:
-    """Defines which statistics should be collected and written."""
+    """
+    Defines which statistics should be collected and written.
+    """
 
-    enabled: bool
-    count_by_level: bool
-    count_by_rule: bool
-    count_by_process: bool
-    detect_repetitive_messages: bool
-    top_repetitive_message_limit: int
+    enable_statistics: bool
+    count_entries_by_level: bool
+    count_entries_by_rule: bool
+    count_entries_by_source: bool
+    detect_repeated_messages: bool
+    top_repeated_message_limit: int
 
 
 @dataclass(frozen=True)
 class FilterConfig:
-    """Groups all filtering rules and global exclusions."""
+    """
+    Groups filtering rules and global exclusion settings.
+    """
 
     rules: list[FilterRule]
-    global_exclude_levels: list[str]
-    global_exclude_processes: list[str]
-    global_exclude_message_contains: list[str]
+    exclude_log_levels: list[str]
+    exclude_sources: list[str]
+    exclude_messages_containing: list[str]
 
 
 @dataclass(frozen=True)
 class AppConfig:
-    """Root configuration object for the application."""
+    """
+    Represents the complete application configuration loaded from a profile.
+    """
 
-    input: InputConfig
-    output: OutputConfig
-    filters: FilterConfig
+    profile: ProfileConfig
+    input_settings: InputConfig
+    output_settings: OutputConfig
+    filtering: FilterConfig
     statistics: StatisticsConfig
 
 
 @dataclass(frozen=True)
 class MatchedLogEntry:
-    """Represents a parsed log entry together with the name of the matching rule."""
+    """
+    Represents a parsed log entry together with the rule that matched it.
+    """
 
     rule_name: str
     entry: LogEntry
@@ -88,7 +122,9 @@ class MatchedLogEntry:
 
 @dataclass(frozen=True)
 class ExtractionResult:
-    """Represents the result of processing a log file."""
+    """
+    Represents the result produced by processing a log file.
+    """
 
     input_file: str
     total_lines_read: int
