@@ -1,0 +1,4 @@
+Feb 26 13:09:01 demo-host app-service[2296]: 13:09:01.146 [MAIN] ERROR com.example.service.EventProcessor - Failed to process event
+Feb 26 13:09:02 demo-host app-service[2296]: 13:09:02.146 [MAIN] INFO com.example.service.EventProcessor - Processed event successfully
+Feb 26 13:09:03 demo-host worker-service[888]: 13:09:03.146 [WORKER] WARN com.example.worker.JobRunner - Connection timeout
+Feb 26 13:09:04 demo-host systemd-journald[255]: Forwarding to syslog missed 8 messages.

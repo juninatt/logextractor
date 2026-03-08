@@ -19,6 +19,9 @@ dist/
 build/
 *.egg-info/
 
+# Generated output
+output/
+
 # OS files
 .DS_Store
 Thumbs.db

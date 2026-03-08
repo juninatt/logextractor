@@ -76,3 +76,22 @@ class AppConfig:
     output: OutputConfig
     filters: FilterConfig
     statistics: StatisticsConfig
+
+
+@dataclass(frozen=True)
+class MatchedLogEntry:
+    """Represents a parsed log entry together with the name of the matching rule."""
+
+    rule_name: str
+    entry: LogEntry
+
+
+@dataclass(frozen=True)
+class ExtractionResult:
+    """Represents the result of processing a log file."""
+
+    input_file: str
+    total_lines_read: int
+    total_lines_parsed: int
+    total_lines_matched: int
+    matched_entries: list[MatchedLogEntry]

@@ -10,7 +10,17 @@
     "verbosity": "normal"
   },
   "filters": {
-    "rules": [],
+    "rules": [
+      {
+        "name": "error_events",
+        "levels": ["ERROR"],
+        "processes": ["app-service"],
+        "logger_contains_any": ["com.example.service"],
+        "message_contains_any": ["Failed"],
+        "context_before_seconds": 0,
+        "context_after_seconds": 0
+      }
+    ],
     "global_exclude_levels": [],
     "global_exclude_processes": [],
     "global_exclude_message_contains": []
