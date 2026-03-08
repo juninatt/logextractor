@@ -1,0 +1,40 @@
+{
+  "profile": {
+    "name": "warning-focused",
+    "description": "Highlights warning and error events for early issue detection"
+  },
+  "input_settings": {
+    "log_timestamp_format": "syslog",
+    "file_encoding": "utf-8"
+  },
+  "output_settings": {
+    "output_file_path": "output/warning-focused.txt",
+    "write_run_summary": true,
+    "write_statistics": true,
+    "output_verbosity_level": "normal"
+  },
+  "filtering": {
+    "rules": [
+      {
+        "rule_name": "warning_and_error_events",
+        "match_log_levels": ["WARN", "ERROR"],
+        "match_sources": null,
+        "match_logger_name_contains": null,
+        "match_message_contains": null,
+        "include_context_before_seconds": 5,
+        "include_context_after_seconds": 5
+      }
+    ],
+    "exclude_log_levels": ["DEBUG", "TRACE"],
+    "exclude_sources": [],
+    "exclude_messages_containing": []
+  },
+  "statistics": {
+    "enable_statistics": true,
+    "count_entries_by_level": true,
+    "count_entries_by_rule": true,
+    "count_entries_by_source": true,
+    "detect_repeated_messages": true,
+    "top_repeated_message_limit": 10
+  }
+}

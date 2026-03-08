@@ -1,0 +1,40 @@
+{
+  "profile": {
+    "name": "message-patterns",
+    "description": "Searches for specific message patterns such as connection failures"
+  },
+  "input_settings": {
+    "log_timestamp_format": "syslog",
+    "file_encoding": "utf-8"
+  },
+  "output_settings": {
+    "output_file_path": "output/message-patterns.txt",
+    "write_run_summary": true,
+    "write_statistics": true,
+    "output_verbosity_level": "verbose"
+  },
+  "filtering": {
+    "rules": [
+      {
+        "rule_name": "connection_problems",
+        "match_log_levels": ["WARN", "ERROR"],
+        "match_sources": null,
+        "match_logger_name_contains": null,
+        "match_message_contains": ["timeout", "connection", "failed"],
+        "include_context_before_seconds": 10,
+        "include_context_after_seconds": 15
+      }
+    ],
+    "exclude_log_levels": [],
+    "exclude_sources": [],
+    "exclude_messages_containing": []
+  },
+  "statistics": {
+    "enable_statistics": true,
+    "count_entries_by_level": true,
+    "count_entries_by_rule": true,
+    "count_entries_by_source": true,
+    "detect_repeated_messages": true,
+    "top_repeated_message_limit": 15
+  }
+}

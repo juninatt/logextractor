@@ -1,0 +1,40 @@
+{
+  "profile": {
+    "name": "broad-analysis",
+    "description": "Broad analysis of logs with minimal filtering and full statistics"
+  },
+  "input_settings": {
+    "log_timestamp_format": "syslog",
+    "file_encoding": "utf-8"
+  },
+  "output_settings": {
+    "output_file_path": "output/broad-analysis.txt",
+    "write_run_summary": true,
+    "write_statistics": true,
+    "output_verbosity_level": "verbose"
+  },
+  "filtering": {
+    "rules": [
+      {
+        "rule_name": "all_events",
+        "match_log_levels": ["INFO", "WARN", "ERROR"],
+        "match_sources": null,
+        "match_logger_name_contains": null,
+        "match_message_contains": null,
+        "include_context_before_seconds": 0,
+        "include_context_after_seconds": 0
+      }
+    ],
+    "exclude_log_levels": [],
+    "exclude_sources": [],
+    "exclude_messages_containing": []
+  },
+  "statistics": {
+    "enable_statistics": true,
+    "count_entries_by_level": true,
+    "count_entries_by_rule": true,
+    "count_entries_by_source": true,
+    "detect_repeated_messages": true,
+    "top_repeated_message_limit": 20
+  }
+}

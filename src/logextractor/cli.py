@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime
 from pathlib import Path
 
 from logextractor.config.loader import ConfigLoader
@@ -6,27 +7,53 @@ from logextractor.extraction.extractor import LogExtractor
 from logextractor.reporting.writer import ResultWriter
 
 
+DEFAULT_CONFIG_DIRECTORY = Path("config")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="logextractor",
         description="Extract matching log entries from a log file using JSON rules.",
     )
-    parser.add_argument("--input", required=True, help="Path to the input log file.")
-    parser.add_argument("--config", required=True, help="Path to the JSON config file.")
     parser.add_argument(
+        "-i",
+        "--input",
+        required=True,
+        help="Path to the input log file.",
+    )
+    parser.add_argument(
+        "-c",
+        "--config",
+        required=True,
+        help="Configuration file name or path.",
+    )
+    parser.add_argument(
+        "-y",
         "--year",
         type=int,
-        required=True,
-        help="Year used when parsing syslog timestamps.",
+        default=datetime.now().year,
+        help="Year used when parsing syslog timestamps. Defaults to the current year.",
     )
     return parser
+
+
+def resolve_config_path(config_argument: str) -> Path:
+    config_path = Path(config_argument)
+
+    if config_path.is_absolute():
+        return config_path
+
+    if config_path.parent == Path("."):
+        return DEFAULT_CONFIG_DIRECTORY / config_path
+
+    return config_path
 
 
 def main() -> None:
     args = build_parser().parse_args()
 
     input_path = Path(args.input)
-    config_path = Path(args.config)
+    config_path = resolve_config_path(args.config)
 
     config = ConfigLoader.load(config_path)
     extractor = LogExtractor(year=args.year)
