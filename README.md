@@ -13,6 +13,38 @@ The tool parses syslog-style log files, applies configurable filtering rules, an
 - Extract matching entries to a readable output file
 - Run directly from the command line
 
+## Installation and usage
+
+Install the package in editable mode:
+```bash
+    python -m pip install -e .
+```
+
+Run the tool from the command line:
+
+```bash
+    python -m logextractor -i example.log -c message-patterns.json
+```
+This extracts log entries matching the selected profile and writes the results
+to the configured output file.  
+
+Configuration files are located in the config/ directory and can be referenced by name.  
+Example profiles include:
+* ```error-focused.json```
+* ```warning-focused.json```
+* ```source-focused.json```
+* ```message-patterns.json```
+* ```noise-reduction.json```
+* ```broad-analysis.json```
+
+Arguments:
+
+| Argument       | Description |
+|----------------|------------|
+| `-i, --input`  | Path to the log file |
+| `-c, --config` | Path to the JSON configuration |
+| `-y, --year`   | Year used when parsing syslog timestamps (defaults to current year) |
+
 ## Project structure
 src/logextractor  
 ├─ config       # configuration loading  
@@ -22,28 +54,8 @@ src/logextractor
 ├─ parsing      # log parsing  
 ├─ reporting    # output writer  
 ├─ cli.py       # command line interface  
-└─ __main__.py  # module entry point  
-
-## Installation and usage
-
-Install the package in editable mode:
-```bash
-  python -m pip install -e .
-```
-
-Run the tool from the command line:
-
-```bash
-    python -m logextractor --input sample.log --config config/example-config.json --year 2026
-```
-
-Arguments:
-
-| Argument | Description |
-|----------|-------------|
-| `--input` | Path to the log file |
-| `--config` | Path to the JSON configuration |
-| `--year` | Year used when parsing syslog timestamps |
+├─ constants.py # shared constant values 
+└─ __main__.py  # module entry point 
 
 ## Status
 
