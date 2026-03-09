@@ -1,8 +1,8 @@
 """
-Provides the CLI entry point for the logextractor application.
+Provide the command-line entry point for the logextractor application.
 
-This module parses command-line arguments, loads configuration profiles,
-and runs the log extraction pipeline.
+This module parses command-line arguments, resolves the selected configuration
+profile, and runs the extraction workflow.
 """
 
 import argparse
@@ -15,6 +15,7 @@ from logextractor.reporting.writer import ResultWriter
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Create and return the argument parser used by the CLI."""
     parser = argparse.ArgumentParser(
         prog="logextractor",
         description="Extract matching log entries from a log file using JSON rules.",
@@ -42,6 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def resolve_config_path(config_argument: str) -> Path:
+    """Resolve the configuration path from either a file name or an explicit path."""
     config_path = Path(config_argument)
 
     if config_path.is_absolute():
@@ -54,6 +56,7 @@ def resolve_config_path(config_argument: str) -> Path:
 
 
 def main() -> None:
+    """Run the CLI extraction workflow."""
     args = build_parser().parse_args()
 
     input_path = Path(args.input)
@@ -64,7 +67,7 @@ def main() -> None:
     result = extractor.extract(input_path=input_path, config_path=config_path)
 
     output_path = Path(config.output_settings.output_file_path)
-    ResultWriter.write(result=result, output_path=output_path)
+    ResultWriter.write(result=result, config=config, output_path=output_path)
 
     print(f"Matched entries: {result.total_lines_matched}")
     print(f"Output written to: {output_path}")
