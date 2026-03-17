@@ -1,14 +1,14 @@
 {
   "profile": {
-    "name": "warning-focused",
-    "description": "Highlights warning and error events for early issue detection"
+    "name": "log-level-focused",
+    "description": "Highlights events based on lof level (INFO, WARN, DEBUG, ERROR) with statistics and minimal noise"
   },
   "input_settings": {
     "log_timestamp_format": "syslog",
     "file_encoding": "utf-8"
   },
   "output_settings": {
-    "output_file_path": "output/warning-focused.txt",
+    "output_file_path": "output/log-level-focused.txt",
     "write_run_summary": true,
     "write_statistics": true,
     "output_verbosity_level": "normal"
@@ -16,16 +16,15 @@
   "filtering": {
     "rules": [
       {
-        "rule_name": "warning_and_error_events",
-        "match_log_levels": ["WARN", "ERROR"],
+        "rule_name": "log_level_match",
+        "match_log_levels": ["ERROR", "DEBUG"],
         "match_sources": null,
         "match_logger_name_contains": null,
         "match_message_contains": null,
-        "include_context_before_seconds": 5,
-        "include_context_after_seconds": 5
+        "include_context_before_seconds": 10,
+        "include_context_after_seconds": 10
       }
     ],
-    "exclude_log_levels": ["DEBUG", "TRACE"],
     "exclude_sources": [],
     "exclude_messages_containing": []
   },

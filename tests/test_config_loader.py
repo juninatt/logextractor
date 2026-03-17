@@ -6,8 +6,7 @@ from logextractor.config.loader import ConfigLoader
 
 
 PROFILE_PATHS = [
-    Path("config/error-focused.json"),
-    Path("config/warning-focused.json"),
+    Path("config/log-level-focused.json"),
     Path("config/source-focused.json"),
     Path("config/message-patterns.json"),
     Path("config/noise-reduction.json"),
@@ -45,9 +44,8 @@ def test_each_rule_has_a_name_and_log_levels(config_path: Path) -> None:
 
 
 def test_error_focused_profile_has_expected_core_values() -> None:
-    config = ConfigLoader.load(Path("config/error-focused.json"))
+    config = ConfigLoader.load(Path("config/log-level-focused.json"))
 
-    assert config.profile.name == "error-focused"
-    assert config.output_settings.output_file_path == "output/error-focused.txt"
-    assert config.filtering.rules[0].rule_name == "error_events"
-    assert config.filtering.rules[0].match_log_levels == ["ERROR"]
+    assert config.profile.name == "log-level-focused"
+    assert config.output_settings.output_file_path == "output/log-level-focused.txt"
+    assert config.filtering.rules[0].rule_name == "log_level_match"
