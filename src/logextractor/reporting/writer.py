@@ -5,9 +5,12 @@ This module formats the extraction output together with the active
 configuration profile so that each result file is self-describing.
 """
 
+from collections import Counter
+from datetime import datetime
 from pathlib import Path
+from typing import TextIO
 
-from logextractor.domain.models import AppConfig, ExtractionResult, FilterRule
+from logextractor.domain.models import AppConfig, ExtractionResult, FilterRule, MatchedSequence
 
 
 class ResultWriter:
@@ -17,10 +20,6 @@ class ResultWriter:
     def write(result: ExtractionResult, config: AppConfig, output_path: Path) -> None:
         """
         Write the extraction result and the relevant profile configuration to disk.
-
-        The output file includes both the extracted entries and the active
-        filtering settings so the result remains understandable without
-        reopening the original configuration file.
         """
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -73,15 +72,22 @@ class ResultWriter:
                 f"{ResultWriter._format_bool(config.output_settings.write_statistics)}\n\n"
             )
 
-            file.write("Matched entries\n")
+            file.write("Trigger summary\n")
             file.write("---------------\n")
+            ResultWriter._write_trigger_summary(file, result)
+            file.write("\n")
 
-            for matched_entry in result.matched_entries:
-                file.write(f"[{matched_entry.rule_name}] {matched_entry.entry.raw_line}\n")
+            file.write("Matched sequences\n")
+            file.write("-----------------\n\n")
+
+            for index, sequence in enumerate(result.sequences, start=1):
+                ResultWriter._write_sequence(file, index, sequence)
 
     @staticmethod
-    def _write_rule(file, rule: FilterRule) -> None:
-        """Write one filtering rule in a readable format."""
+    def _write_rule(file: TextIO, rule: FilterRule) -> None:
+        """
+        Write one filtering rule in a readable format.
+        """
         file.write(f"Rule: {rule.rule_name}\n")
         file.write(
             f"  Match log levels: "
@@ -109,8 +115,71 @@ class ResultWriter:
         )
 
     @staticmethod
+    def _write_trigger_summary(file: TextIO, result: ExtractionResult) -> None:
+        """
+        Write the total number of trigger matches grouped by rule name.
+        """
+        trigger_counts: Counter[str] = Counter()
+
+        for sequence in result.sequences:
+            for trigger in sequence.triggers:
+                trigger_counts[trigger.rule_name] += 1
+
+        if not trigger_counts:
+            file.write("-\n")
+            return
+
+        for rule_name, count in sorted(trigger_counts.items()):
+            file.write(f"{rule_name}: {count}\n")
+
+    @staticmethod
+    def _write_sequence(file: TextIO, index: int, sequence: MatchedSequence) -> None:
+        """
+        Write one matched sequence with aggregated trigger counts and included log entries.
+        """
+        file.write(f"Sequence {index}\n")
+        file.write(f"{'-' * len(f'Sequence {index}')}\n")
+        file.write(
+            f"Window: {ResultWriter._format_timestamp(sequence.start_timestamp)}"
+            f" -> {ResultWriter._format_timestamp(sequence.end_timestamp)}\n"
+        )
+        file.write(
+            f"Duration: "
+            f"{int((sequence.end_timestamp - sequence.start_timestamp).total_seconds())} seconds\n\n"
+        )
+
+        file.write("Triggered by\n")
+        file.write("------------\n")
+        ResultWriter._write_sequence_trigger_summary(file, sequence)
+        file.write("\n")
+
+        file.write("Entries:\n")
+
+        for entry in sequence.entries:
+            file.write(f"{entry.raw_line}\n")
+
+        file.write("\n")
+
+    @staticmethod
+    def _write_sequence_trigger_summary(file: TextIO, sequence: MatchedSequence) -> None:
+        """
+        Write aggregated trigger counts for one sequence grouped by rule name.
+        """
+        trigger_counts: Counter[str] = Counter(trigger.rule_name for trigger in sequence.triggers)
+
+        if not trigger_counts:
+            file.write("-\n")
+            return
+
+        for rule_name, count in sorted(trigger_counts.items()):
+            match_label = "match" if count == 1 else "matches"
+            file.write(f"{rule_name}: {count} {match_label}\n")
+
+    @staticmethod
     def _format_list(values: list[str] | None) -> str:
-        """Format optional string lists for human-readable output."""
+        """
+        Format optional string lists for human-readable output.
+        """
         if not values:
             return "-"
 
@@ -118,5 +187,14 @@ class ResultWriter:
 
     @staticmethod
     def _format_bool(value: bool) -> str:
-        """Format boolean values consistently in output files."""
+        """
+        Format boolean values consistently in output files.
+        """
         return "true" if value else "false"
+
+    @staticmethod
+    def _format_timestamp(value: datetime) -> str:
+        """
+        Format timestamps consistently in output files.
+        """
+        return value.strftime("%Y-%m-%d %H:%M:%S")

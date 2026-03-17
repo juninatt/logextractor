@@ -12,9 +12,7 @@ from datetime import datetime
 
 @dataclass(frozen=True)
 class ProfileConfig:
-    """
-    Describes a named configuration profile and its intended purpose.
-    """
+    """Describes a named configuration profile and its intended purpose."""
 
     name: str
     description: str
@@ -22,9 +20,7 @@ class ProfileConfig:
 
 @dataclass(frozen=True)
 class LogEntry:
-    """
-    Represents a single parsed log entry.
-    """
+    """Represents a single parsed log entry."""
 
     timestamp: datetime
     level: str
@@ -36,9 +32,7 @@ class LogEntry:
 
 @dataclass(frozen=True)
 class FilterRule:
-    """
-    Defines one rule used to match relevant log entries.
-    """
+    """Defines one rule used to match relevant log entries."""
 
     rule_name: str
     match_log_levels: list[str]
@@ -51,9 +45,7 @@ class FilterRule:
 
 @dataclass(frozen=True)
 class InputConfig:
-    """
-    Defines how the input log file should be read.
-    """
+    """Defines how the input log file should be read."""
 
     log_timestamp_format: str
     file_encoding: str
@@ -61,9 +53,7 @@ class InputConfig:
 
 @dataclass(frozen=True)
 class OutputConfig:
-    """
-    Defines how extracted results should be written.
-    """
+    """Defines how extracted results should be written."""
 
     output_file_path: str
     write_run_summary: bool
@@ -73,9 +63,7 @@ class OutputConfig:
 
 @dataclass(frozen=True)
 class StatisticsConfig:
-    """
-    Defines which statistics should be collected and written.
-    """
+    """Defines which statistics should be collected and written."""
 
     enable_statistics: bool
     count_entries_by_level: bool
@@ -87,9 +75,7 @@ class StatisticsConfig:
 
 @dataclass(frozen=True)
 class FilterConfig:
-    """
-    Groups filtering rules and global exclusion settings.
-    """
+    """Groups filtering rules and global exclusion settings."""
 
     rules: list[FilterRule]
     exclude_log_levels: list[str]
@@ -99,9 +85,7 @@ class FilterConfig:
 
 @dataclass(frozen=True)
 class AppConfig:
-    """
-    Represents the complete application configuration loaded from a profile.
-    """
+    """Represents the complete application configuration loaded from a profile."""
 
     profile: ProfileConfig
     input_settings: InputConfig
@@ -111,23 +95,32 @@ class AppConfig:
 
 
 @dataclass(frozen=True)
-class MatchedLogEntry:
-    """
-    Represents a parsed log entry together with the rule that matched it.
-    """
+class MatchTrigger:
+    """Represents a rule match that triggered a sequence."""
 
     rule_name: str
-    entry: LogEntry
+    timestamp: datetime
+    source: str | None
+    logger: str | None
+    message: str
+
+
+@dataclass(frozen=True)
+class MatchedSequence:
+    """Represents a merged time window triggered by one or more rule matches."""
+
+    start_timestamp: datetime
+    end_timestamp: datetime
+    triggers: list[MatchTrigger]
+    entries: list[LogEntry]
 
 
 @dataclass(frozen=True)
 class ExtractionResult:
-    """
-    Represents the result produced by processing a log file.
-    """
+    """Represents the result produced by processing a log file."""
 
     input_file: str
     total_lines_read: int
     total_lines_parsed: int
     total_lines_matched: int
-    matched_entries: list[MatchedLogEntry]
+    sequences: list[MatchedSequence]
