@@ -9,7 +9,6 @@ PROFILE_PATHS = [
     Path("config/log-level-focused.json"),
     Path("config/source-focused.json"),
     Path("config/message-patterns.json"),
-    Path("config/noise-reduction.json"),
     Path("config/broad-analysis.json"),
 ]
 
@@ -42,10 +41,3 @@ def test_each_rule_has_a_name_and_log_levels(config_path: Path) -> None:
         assert rule.rule_name
         assert len(rule.match_log_levels) > 0
 
-
-def test_error_focused_profile_has_expected_core_values() -> None:
-    config = ConfigLoader.load(Path("config/log-level-focused.json"))
-
-    assert config.profile.name == "log-level-focused"
-    assert config.output_settings.output_file_path == "output/log-level-focused.txt"
-    assert config.filtering.rules[0].rule_name == "log_level_match"

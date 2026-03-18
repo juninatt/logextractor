@@ -24,6 +24,14 @@ OUTPUT_FILE_PATH = "output_file_path"  # Path to the output file
 WRITE_RUN_SUMMARY = "write_run_summary"  # Whether a summary of the run should be written
 WRITE_STATISTICS = "write_statistics"  # Whether statistics should be included
 OUTPUT_VERBOSITY_LEVEL = "output_verbosity_level"  # Controls how much output detail is written
+STRIP_COMMON_LOG_PREFIX = "strip_common_log_prefix"
+
+# Time restraints
+
+TIME_RANGE = "time_range"  # Root section describing optional time filtering
+TIMEZONE = "timezone"  # Time zone used for configured time values
+START_TIME = "start_time"  # Lower inclusive time boundary in HH:MM:SS
+END_TIME = "end_time"  # Upper inclusive time boundary in HH:MM:SS
 
 # Filtering configuration
 

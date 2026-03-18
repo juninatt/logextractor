@@ -1,11 +1,3 @@
-"""
-Define the core domain models used throughout the application.
-
-These dataclasses represent parsed log entries, configuration objects,
-filter rules, and extraction results. They form the internal typed model
-used across the parsing, filtering, extraction, and reporting layers.
-"""
-
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -59,6 +51,7 @@ class OutputConfig:
     write_run_summary: bool
     write_statistics: bool
     output_verbosity_level: str
+    strip_common_log_prefix: bool
 
 
 @dataclass(frozen=True)
@@ -84,6 +77,16 @@ class FilterConfig:
 
 
 @dataclass(frozen=True)
+class TimeRangeConfig:
+    """Defines an optional UTC time range used to restrict log analysis."""
+
+    enabled: bool
+    timezone: str
+    start_time: str | None
+    end_time: str | None
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """Represents the complete application configuration loaded from a profile."""
 
@@ -92,6 +95,7 @@ class AppConfig:
     output_settings: OutputConfig
     filtering: FilterConfig
     statistics: StatisticsConfig
+    time_range: TimeRangeConfig
 
 
 @dataclass(frozen=True)
@@ -120,6 +124,7 @@ class ExtractionResult:
     """Represents the result produced by processing a log file."""
 
     input_file: str
+    source_identifier: str | None
     total_lines_read: int
     total_lines_parsed: int
     total_lines_matched: int

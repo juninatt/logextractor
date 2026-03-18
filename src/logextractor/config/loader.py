@@ -18,6 +18,7 @@ from logextractor.domain.models import (
     OutputConfig,
     ProfileConfig,
     StatisticsConfig,
+    TimeRangeConfig,
 )
 
 
@@ -25,7 +26,6 @@ class ConfigLoader:
     """
     Load application configuration from a JSON file into typed domain objects.
     """
-
 
     @staticmethod
     def load(config_path: Path) -> AppConfig:
@@ -56,6 +56,18 @@ class ConfigLoader:
             write_run_summary=output_settings_data[keys.WRITE_RUN_SUMMARY],
             write_statistics=output_settings_data[keys.WRITE_STATISTICS],
             output_verbosity_level=output_settings_data[keys.OUTPUT_VERBOSITY_LEVEL],
+            strip_common_log_prefix=output_settings_data.get(
+                keys.STRIP_COMMON_LOG_PREFIX, False
+            ),
+        )
+
+        time_range_data = data[keys.TIME_RANGE]
+
+        time_range = TimeRangeConfig(
+            enabled=time_range_data["enabled"],
+            timezone=time_range_data["timezone"],
+            start_time=time_range_data.get("start_time"),
+            end_time=time_range_data.get("end_time"),
         )
 
         rules = ConfigLoader._parse_rules(filtering_data[keys.RULES])
@@ -84,6 +96,7 @@ class ConfigLoader:
             output_settings=output_config,
             filtering=filter_config,
             statistics=statistics_config,
+            time_range=time_range,
         )
 
     @staticmethod

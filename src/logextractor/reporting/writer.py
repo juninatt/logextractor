@@ -5,16 +5,27 @@ This module formats the extraction output together with the active
 configuration profile so that each result file is self-describing.
 """
 
+import re
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import TextIO
 
-from logextractor.domain.models import AppConfig, ExtractionResult, FilterRule, MatchedSequence
+from logextractor.domain.models import (
+    AppConfig,
+    ExtractionResult,
+    FilterRule,
+    LogEntry,
+    MatchedSequence,
+)
 
 
 class ResultWriter:
     """Write extraction results and active configuration details to an output file."""
+
+    _COMMON_LOG_PREFIX_PATTERN = re.compile(
+        r"^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\S+\s+"
+    )
 
     @staticmethod
     def write(result: ExtractionResult, config: AppConfig, output_path: Path) -> None:
@@ -31,6 +42,7 @@ class ResultWriter:
             file.write(f"Description: {config.profile.description}\n\n")
 
             file.write(f"Input file: {result.input_file}\n")
+            file.write(f"Source identifier: {result.source_identifier or '-'}\n")
             file.write(f"Total lines read: {result.total_lines_read}\n")
             file.write(f"Total lines parsed: {result.total_lines_parsed}\n")
             file.write(f"Total matched entries: {result.total_lines_matched}\n\n")
@@ -69,8 +81,21 @@ class ResultWriter:
             )
             file.write(
                 f"Write statistics: "
-                f"{ResultWriter._format_bool(config.output_settings.write_statistics)}\n\n"
+                f"{ResultWriter._format_bool(config.output_settings.write_statistics)}\n"
             )
+            file.write(
+                f"Strip common log prefix: "
+                f"{ResultWriter._format_bool(config.output_settings.strip_common_log_prefix)}\n\n"
+            )
+
+            file.write("Time range\n")
+            file.write("----------\n")
+            file.write(
+                f"Enabled: {ResultWriter._format_bool(config.time_range.enabled)}\n"
+            )
+            file.write(f"Timezone: {config.time_range.timezone}\n")
+            file.write(f"Start time: {config.time_range.start_time or '-'}\n")
+            file.write(f"End time: {config.time_range.end_time or '-'}\n\n")
 
             file.write("Trigger summary\n")
             file.write("---------------\n")
@@ -81,7 +106,12 @@ class ResultWriter:
             file.write("-----------------\n\n")
 
             for index, sequence in enumerate(result.sequences, start=1):
-                ResultWriter._write_sequence(file, index, sequence)
+                ResultWriter._write_sequence(
+                    file=file,
+                    index=index,
+                    sequence=sequence,
+                    strip_common_log_prefix=config.output_settings.strip_common_log_prefix,
+                )
 
     @staticmethod
     def _write_rule(file: TextIO, rule: FilterRule) -> None:
@@ -133,7 +163,12 @@ class ResultWriter:
             file.write(f"{rule_name}: {count}\n")
 
     @staticmethod
-    def _write_sequence(file: TextIO, index: int, sequence: MatchedSequence) -> None:
+    def _write_sequence(
+        file: TextIO,
+        index: int,
+        sequence: MatchedSequence,
+        strip_common_log_prefix: bool,
+    ) -> None:
         """
         Write one matched sequence with aggregated trigger counts and included log entries.
         """
@@ -153,10 +188,19 @@ class ResultWriter:
         ResultWriter._write_sequence_trigger_summary(file, sequence)
         file.write("\n")
 
-        file.write("Entries:\n")
+        file.write("Entries\n")
+        file.write("-------\n")
 
         for entry in sequence.entries:
-            file.write(f"{entry.raw_line}\n")
+            formatted_line = ResultWriter._format_output_line(
+                entry,
+                strip_common_log_prefix,
+            )
+
+            if ResultWriter._is_trigger_entry(entry, sequence):
+                file.write(f">>> {formatted_line}\n")
+            else:
+                file.write(f"    {formatted_line}\n")
 
         file.write("\n")
 
@@ -165,7 +209,9 @@ class ResultWriter:
         """
         Write aggregated trigger counts for one sequence grouped by rule name.
         """
-        trigger_counts: Counter[str] = Counter(trigger.rule_name for trigger in sequence.triggers)
+        trigger_counts: Counter[str] = Counter(
+            trigger.rule_name for trigger in sequence.triggers
+        )
 
         if not trigger_counts:
             file.write("-\n")
@@ -174,6 +220,34 @@ class ResultWriter:
         for rule_name, count in sorted(trigger_counts.items()):
             match_label = "match" if count == 1 else "matches"
             file.write(f"{rule_name}: {count} {match_label}\n")
+
+    @staticmethod
+    def _is_trigger_entry(entry: LogEntry, sequence: MatchedSequence) -> bool:
+        """
+        Return True if the entry corresponds to one of the sequence triggers.
+        """
+        for trigger in sequence.triggers:
+            if (
+                entry.timestamp == trigger.timestamp
+                and entry.source == trigger.source
+                and entry.logger == trigger.logger
+                and entry.message == trigger.message
+            ):
+                return True
+
+        return False
+
+    @staticmethod
+    def _format_output_line(entry: LogEntry, strip_common_log_prefix: bool) -> str:
+        """
+        Format one output line and remove the common syslog prefix if enabled.
+        """
+        line = entry.raw_line.rstrip("\n")
+
+        if not strip_common_log_prefix:
+            return line
+
+        return ResultWriter._COMMON_LOG_PREFIX_PATTERN.sub("", line, count=1)
 
     @staticmethod
     def _format_list(values: list[str] | None) -> str:

@@ -13,6 +13,12 @@
     "write_statistics": true,
     "output_verbosity_level": "verbose"
   },
+  "time_range": {
+      "enabled": false,
+      "timezone": "UTC",
+      "start_time": null,
+      "end_time": null
+  },
   "filtering": {
     "rules": [
       {

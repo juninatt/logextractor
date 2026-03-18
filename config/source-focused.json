@@ -13,6 +13,12 @@
     "write_statistics": true,
     "output_verbosity_level": "normal"
   },
+  "time_range": {
+      "enabled": false,
+      "timezone": "UTC",
+      "start_time": null,
+      "end_time": null
+  },
   "filtering": {
     "rules": [
       {
@@ -25,7 +31,7 @@
         "include_context_after_seconds": 5
       }
     ],
-    "exclude_log_levels": ["DEBUG", "TRACE"],
+    "exclude_log_levels": ["DEBUG"],
     "exclude_sources": [],
     "exclude_messages_containing": []
   },
