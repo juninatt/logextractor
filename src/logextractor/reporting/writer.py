@@ -24,7 +24,7 @@ class ResultWriter:
     """Write extraction results and active configuration details to an output file."""
 
     _COMMON_LOG_PREFIX_PATTERN = re.compile(
-        r"^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\S+\s+"
+        r"^([A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+\S+\s+"
     )
 
     @staticmethod
@@ -262,7 +262,7 @@ class ResultWriter:
         if not strip_common_log_prefix:
             return line
 
-        return ResultWriter._COMMON_LOG_PREFIX_PATTERN.sub("", line, count=1)
+        return ResultWriter._COMMON_LOG_PREFIX_PATTERN.sub(r"\1 ", line, count=1)
 
     @staticmethod
     def _format_list(values: list[str] | None) -> str:
