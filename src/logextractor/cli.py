@@ -6,6 +6,7 @@ profile, and runs the extraction workflow.
 """
 
 import argparse
+from datetime import datetime
 from pathlib import Path
 
 from logextractor.config.loader import ConfigLoader
@@ -55,6 +56,20 @@ def resolve_config_path(config_argument: str) -> Path:
     return config_path
 
 
+def build_output_path(input_path: Path, config_path: Path, configured_output_path: str) -> Path:
+    """
+    Build the output file path using input file name, current time, and config file name.
+
+    The directory is taken from the configured output path. The file name is generated as:
+    <input-file-stem>_<HHMM>_<config-file-stem>.txt
+    """
+    output_directory = Path(configured_output_path).parent
+    timestamp = datetime.now().strftime("%H%M")
+
+    file_name = f"{input_path.stem}_{timestamp}_{config_path.stem}.txt"
+    return output_directory / file_name
+
+
 def main() -> None:
     """Run the CLI extraction workflow."""
     args = build_parser().parse_args()
@@ -66,7 +81,12 @@ def main() -> None:
     extractor = LogExtractor(year=args.year)
     result = extractor.extract(input_path=input_path, config_path=config_path)
 
-    output_path = Path(config.output_settings.output_file_path)
+    output_path = build_output_path(
+        input_path=input_path,
+        config_path=config_path,
+        configured_output_path=config.output_settings.output_file_path,
+    )
+
     ResultWriter.write(result=result, config=config, output_path=output_path)
 
     print(f"Matched entries: {result.total_lines_matched}")

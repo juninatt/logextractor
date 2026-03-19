@@ -8,7 +8,7 @@
     "file_encoding": "utf-8"
   },
   "output_settings": {
-    "output_file_path": "output/log-level-focused.txt",
+    "output_file_path": "output/log-levels.txt",
     "strip_common_log_prefix": true
   },
   "time_range": {

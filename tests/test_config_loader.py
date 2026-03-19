@@ -6,7 +6,7 @@ from logextractor.config.loader import ConfigLoader
 
 
 PROFILE_PATHS = [
-    Path("config/log-level-focused.json"),
+    Path("config/log-levels.json"),
 ]
 
 
