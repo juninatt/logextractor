@@ -35,83 +35,97 @@ class ResultWriter:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         with output_path.open("w", encoding="utf-8") as file:
-            file.write("logextractor result\n")
-            file.write("===================\n\n")
+            ResultWriter._write_header(file, result, config)
+            ResultWriter._write_filtering_section(file, config)
+            ResultWriter._write_time_range_section(file, config)
+            ResultWriter._write_trigger_summary_section(file, result)
+            ResultWriter._write_sequences_section(file, result, config)
 
-            file.write(f"Profile: {config.profile.name}\n")
-            file.write(f"Description: {config.profile.description}\n\n")
+    @staticmethod
+    def _write_header(
+        file: TextIO,
+        result: ExtractionResult,
+        config: AppConfig,
+    ) -> None:
+        """
+        Write the top header and run overview.
+        """
+        file.write("LOG EXTRACTOR RESULTS\n")
+        file.write("---\n")
+        file.write(f"Profile: {config.profile.name}\n")
+        file.write(f"Description: {config.profile.description}\n")
+        file.write("---\n")
+        file.write(
+            f"Input file: {result.input_file} || "
+            f"Source identifier: {result.source_identifier or '-'}\n"
+        )
+        file.write(
+            f"Lines read: {result.total_lines_read} || "
+            f"Lines parsed: {result.total_lines_parsed} || "
+            f"Matched entries: {result.total_lines_matched}\n\n"
+        )
 
-            file.write(f"Input file: {result.input_file}\n")
-            file.write(f"Source identifier: {result.source_identifier or '-'}\n")
-            file.write(f"Total lines read: {result.total_lines_read}\n")
-            file.write(f"Total lines parsed: {result.total_lines_parsed}\n")
-            file.write(f"Total matched entries: {result.total_lines_matched}\n\n")
+    @staticmethod
+    def _write_filtering_section(file: TextIO, config: AppConfig) -> None:
+        """
+        Write the active filtering rules section.
+        """
+        file.write("Active filtering configuration:\n")
+        file.write("---\n")
 
-            file.write("Active filtering configuration\n")
-            file.write("------------------------------\n")
-
-            for rule in config.filtering.rules:
-                ResultWriter._write_rule(file, rule)
-                file.write("\n")
-
-            file.write("Global exclusions\n")
-            file.write("-----------------\n")
-            file.write(
-                f"Exclude log levels: "
-                f"{ResultWriter._format_list(config.filtering.exclude_log_levels)}\n"
-            )
-            file.write(
-                f"Exclude sources: "
-                f"{ResultWriter._format_list(config.filtering.exclude_sources)}\n"
-            )
-            file.write(
-                f"Exclude messages containing: "
-                f"{ResultWriter._format_list(config.filtering.exclude_messages_containing)}\n\n"
-            )
-
-            file.write("Output settings\n")
-            file.write("---------------\n")
-            file.write(
-                f"Output verbosity level: "
-                f"{config.output_settings.output_verbosity_level}\n"
-            )
-            file.write(
-                f"Write run summary: "
-                f"{ResultWriter._format_bool(config.output_settings.write_run_summary)}\n"
-            )
-            file.write(
-                f"Write statistics: "
-                f"{ResultWriter._format_bool(config.output_settings.write_statistics)}\n"
-            )
-            file.write(
-                f"Strip common log prefix: "
-                f"{ResultWriter._format_bool(config.output_settings.strip_common_log_prefix)}\n\n"
-            )
-
-            file.write("Time range\n")
-            file.write("----------\n")
-            file.write(
-                f"Enabled: {ResultWriter._format_bool(config.time_range.enabled)}\n"
-            )
-            file.write(f"Timezone: {config.time_range.timezone}\n")
-            file.write(f"Start time: {config.time_range.start_time or '-'}\n")
-            file.write(f"End time: {config.time_range.end_time or '-'}\n\n")
-
-            file.write("Trigger summary\n")
-            file.write("---------------\n")
-            ResultWriter._write_trigger_summary(file, result)
+        for rule in config.filtering.rules:
+            ResultWriter._write_rule(file, rule)
             file.write("\n")
 
-            file.write("Matched sequences\n")
-            file.write("-----------------\n\n")
+    @staticmethod
+    def _write_time_range_section(file: TextIO, config: AppConfig) -> None:
+        """
+        Write the configured time range section when enabled.
+        """
+        if not config.time_range.enabled:
+            return
 
-            for index, sequence in enumerate(result.sequences, start=1):
-                ResultWriter._write_sequence(
-                    file=file,
-                    index=index,
-                    sequence=sequence,
-                    strip_common_log_prefix=config.output_settings.strip_common_log_prefix,
-                )
+        file.write("Time range\n")
+        file.write("----------\n")
+        file.write(
+            f"Enabled: {ResultWriter._format_bool(config.time_range.enabled)} || "
+            f"Timezone: {config.time_range.timezone} || "
+            f"Start time: {config.time_range.start_time or '-'} || "
+            f"End time: {config.time_range.end_time or '-'}\n\n"
+        )
+
+    @staticmethod
+    def _write_trigger_summary_section(file: TextIO, result: ExtractionResult) -> None:
+        """
+        Write the trigger summary section.
+        """
+        file.write("Trigger summary\n")
+        file.write("---------------\n")
+        ResultWriter._write_trigger_summary(file, result)
+        file.write("\n")
+
+    @staticmethod
+    def _write_sequences_section(
+        file: TextIO,
+        result: ExtractionResult,
+        config: AppConfig,
+    ) -> None:
+        """
+        Write all matched sequences.
+        """
+        total_sequences = len(result.sequences)
+
+        file.write(f"Total matched sequences: {total_sequences}\n")
+        file.write("-----------------\n\n")
+
+        for index, sequence in enumerate(result.sequences, start=1):
+            ResultWriter._write_sequence(
+                file=file,
+                index=index,
+                total_sequences=total_sequences,
+                sequence=sequence,
+                strip_common_log_prefix=config.output_settings.strip_common_log_prefix,
+            )
 
     @staticmethod
     def _write_rule(file: TextIO, rule: FilterRule) -> None:
@@ -166,14 +180,15 @@ class ResultWriter:
     def _write_sequence(
         file: TextIO,
         index: int,
+        total_sequences: int,
         sequence: MatchedSequence,
         strip_common_log_prefix: bool,
     ) -> None:
         """
         Write one matched sequence with aggregated trigger counts and included log entries.
         """
-        file.write(f"Sequence {index}\n")
-        file.write(f"{'-' * len(f'Sequence {index}')}\n")
+        file.write(f"Sequence {index}/{total_sequences}\n")
+        file.write("----------\n")
         file.write(
             f"Window: {ResultWriter._format_timestamp(sequence.start_timestamp)}"
             f" -> {ResultWriter._format_timestamp(sequence.end_timestamp)}\n"

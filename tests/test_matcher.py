@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from logextractor.domain.models import FilterConfig, FilterRule, LogEntry
+from logextractor.domain.models import FilterRule, LogEntry
 from logextractor.filtering.matcher import LogMatcher
 
 
@@ -71,23 +71,3 @@ def test_matches_rule_by_message_fragment() -> None:
     )
 
     assert LogMatcher.matches_rule(entry, rule) is True
-
-
-def test_excludes_entry_by_global_level() -> None:
-    entry = LogEntry(
-        timestamp=datetime(2026, 2, 26, 13, 9, 1),
-        level="DEBUG",
-        source="worker-service",
-        logger="com.example.worker.JobRunner",
-        message="Polling for updates",
-        raw_line="raw log line",
-    )
-
-    filter_config = FilterConfig(
-        rules=[],
-        exclude_log_levels=["DEBUG"],
-        exclude_sources=[],
-        exclude_messages_containing=[],
-    )
-
-    assert LogMatcher.is_excluded(entry, filter_config) is True

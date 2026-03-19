@@ -74,9 +74,6 @@ class LogExtractor:
                 total_lines_parsed += 1
                 parsed_entries.append(entry)
 
-                if LogMatcher.is_excluded(entry, config.filtering):
-                    continue
-
                 for rule in config.filtering.rules:
                     if LogMatcher.matches_rule(entry, rule):
                         total_lines_matched += 1

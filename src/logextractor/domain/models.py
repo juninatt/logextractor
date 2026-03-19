@@ -48,32 +48,14 @@ class OutputConfig:
     """Defines how extracted results should be written."""
 
     output_file_path: str
-    write_run_summary: bool
-    write_statistics: bool
-    output_verbosity_level: str
     strip_common_log_prefix: bool
 
 
 @dataclass(frozen=True)
-class StatisticsConfig:
-    """Defines which statistics should be collected and written."""
-
-    enable_statistics: bool
-    count_entries_by_level: bool
-    count_entries_by_rule: bool
-    count_entries_by_source: bool
-    detect_repeated_messages: bool
-    top_repeated_message_limit: int
-
-
-@dataclass(frozen=True)
 class FilterConfig:
-    """Groups filtering rules and global exclusion settings."""
+    """Groups filtering rules."""
 
     rules: list[FilterRule]
-    exclude_log_levels: list[str]
-    exclude_sources: list[str]
-    exclude_messages_containing: list[str]
 
 
 @dataclass(frozen=True)
@@ -94,7 +76,6 @@ class AppConfig:
     input_settings: InputConfig
     output_settings: OutputConfig
     filtering: FilterConfig
-    statistics: StatisticsConfig
     time_range: TimeRangeConfig
 
 

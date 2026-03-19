@@ -9,38 +9,25 @@
   },
   "output_settings": {
     "output_file_path": "output/log-level-focused.txt",
-    "write_run_summary": true,
-    "write_statistics": true,
-    "output_verbosity_level": "normal",
     "strip_common_log_prefix": true
   },
   "time_range": {
-      "enabled": false,
-      "timezone": "UTC",
-      "start_time": "10:15:00",
-      "end_time": null
+    "enabled": false,
+    "timezone": "UTC",
+    "start_time": "10:15:00",
+    "end_time": null
   },
   "filtering": {
     "rules": [
       {
         "rule_name": "log_level_match",
-        "match_log_levels": ["INFO", "ERROR", "WARN", "DEBUG"],
+        "match_log_levels": ["INFO"],
         "match_sources": null,
         "match_logger_name_contains": null,
         "match_message_contains": null,
         "include_context_before_seconds": 1,
         "include_context_after_seconds": 1
       }
-    ],
-    "exclude_sources": [],
-    "exclude_messages_containing": []
-  },
-  "statistics": {
-    "enable_statistics": true,
-    "count_entries_by_level": true,
-    "count_entries_by_rule": true,
-    "count_entries_by_source": true,
-    "detect_repeated_messages": true,
-    "top_repeated_message_limit": 10
+    ]
   }
 }
