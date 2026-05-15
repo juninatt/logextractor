@@ -1,15 +1,17 @@
 # logextractor
 
-A rule-based CLI tool for extracting relevant events and context from large application log files.
+A CLI tool for extracting relevant log lines from large application log files.
 
-The tool parses syslog-style log files, applies configurable filtering rules, and writes matching log entries to an output file.
+The tool parses supported log formats, applies configurable keyword-based filtering, and writes matching log entries to an output file or prints them to the console.
 
 ## Features
 
-- Parse syslog-style application logs
-- Filter log entries using configurable JSON rules
-- Match by log level, process, logger, or message fragments
+- Parse ISO-style and syslog-style log files
+- Filter log entries using configurable JSON keyword filters
+- Include lines containing specific keywords
 - Exclude unwanted log entries globally
+- Start time windows from trigger keywords
+- Process all `.log` files in the `logs/` directory automatically
 - Extract matching entries to a readable output file
 - Run directly from the command line
 
@@ -20,30 +22,35 @@ Install the package in editable mode:
     python -m pip install -e .
 ```
 
-Run the tool from the command line:
-
+Run the tool from the command line:  
 ```bash
-    python -m logextractor -i example.log -c message-patterns.json
+    python -m logextractor -c config.json
 ```
-This extracts log entries matching the selected profile and writes the results
-to the configured output file.  
+This extracts log entries matching the selected configuration and writes the results
+to the output file.
 
-Configuration files are located in the config/ directory and can be referenced by name.  
-Example profiles include:
-* ```error-focused.json```
-* ```warning-focused.json```
-* ```source-focused.json```
-* ```message-patterns.json```
-* ```noise-reduction.json```
-* ```broad-analysis.json```
+The tool reads all .log files from the logs/ directory in the project root.
+If any file in that directory is not a .log file, the program raises an exception.
 
+Configuration files are located in the config/ directory and can be referenced by name.
+
+The tool can also be run without a configuration file by using manual arguments. Example:
+```bash
+    python -m logextractor -m --include error --print
+```
 Arguments:
 
-| Argument       | Description |
+| Argument        | Description |
 |----------------|------------|
-| `-i, --input`  | Path to the log file |
 | `-c, --config` | Path to the JSON configuration |
+| `-m, --manual` | Use manual CLI arguments instead of a configuration file |
+| `--include`    | Keywords for lines that should be included |
+| `--trigger`    | Keywords for lines that should start a time window |
+| `--exclude`    | Keywords for lines that should always be excluded |
+| `--duration`   | Number of seconds to include after a trigger match |
+| `-o, --output` | Path to the output file |
 | `-y, --year`   | Year used when parsing syslog timestamps (defaults to current year) |
+| `--print`      | Print matching lines to the console instead of writing to file |
 
 ## Project structure
 src/logextractor  
@@ -59,4 +66,4 @@ src/logextractor
 
 ## Status
 
-Early-stage development. Core log parsing, rule matching, and CLI-based extraction are implemented. 
+Early-stage development. Core log parsing, keyword-based filtering, trigger-based time window extraction, and CLI-based execution are implemented.
