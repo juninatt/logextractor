@@ -1,73 +1,77 @@
 from datetime import datetime
+from pathlib import Path
 
-from logextractor.domain.models import FilterRule, LogEntry
+from logextractor.domain.models import ExtractionConfig, LogEntry
 from logextractor.filtering.matcher import LogMatcher
 
 
-def test_matches_rule_by_level_and_source() -> None:
+def test_is_included_when_line_contains_keyword_as_standalone_term() -> None:
     entry = LogEntry(
         timestamp=datetime(2026, 2, 26, 13, 9, 1),
-        level="ERROR",
-        source="app-service",
-        logger="com.example.service.EventProcessor",
-        message="Failed to process event",
-        raw_line="raw log line",
+        file_path=Path("logs/app.log"),
+        line_number=10,
+        raw_line="2026-02-26T13:09:01+00:00 app: error occurred while processing request",
     )
 
-    rule = FilterRule(
-        rule_name="error_events",
-        match_log_levels=["ERROR"],
-        match_sources=["app-service"],
-        match_logger_name_contains=None,
-        match_message_contains=None,
-        include_context_before_seconds=10,
-        include_context_after_seconds=20,
+    config = ExtractionConfig(
+        include_keywords=["error"],
+        trigger_keywords=[],
+        exclude_keywords=[],
+        duration_seconds=30,
     )
 
-    assert LogMatcher.matches_rule(entry, rule) is True
+    assert LogMatcher.is_included(entry, config) is True
 
 
-def test_does_not_match_when_level_differs() -> None:
+def test_is_not_included_when_keyword_only_exists_as_part_of_longer_word() -> None:
     entry = LogEntry(
         timestamp=datetime(2026, 2, 26, 13, 9, 1),
-        level="INFO",
-        source="app-service",
-        logger="com.example.service.EventProcessor",
-        message="Processed event successfully",
-        raw_line="raw log line",
+        file_path=Path("logs/app.log"),
+        line_number=11,
+        raw_line='2026-02-26T13:09:01+00:00 app: Received validator errors:212',
     )
 
-    rule = FilterRule(
-        rule_name="error_events",
-        match_log_levels=["ERROR"],
-        match_sources=["app-service"],
-        match_logger_name_contains=None,
-        match_message_contains=None,
-        include_context_before_seconds=10,
-        include_context_after_seconds=20,
+    config = ExtractionConfig(
+        include_keywords=["error"],
+        trigger_keywords=[],
+        exclude_keywords=[],
+        duration_seconds=30,
     )
 
-    assert LogMatcher.matches_rule(entry, rule) is False
+    assert LogMatcher.is_included(entry, config) is False
 
 
-def test_matches_rule_by_message_fragment() -> None:
+def test_is_trigger_when_line_contains_trigger_keyword() -> None:
     entry = LogEntry(
         timestamp=datetime(2026, 2, 26, 13, 9, 1),
-        level="WARN",
-        source="worker-service",
-        logger="com.example.worker.JobRunner",
-        message="Connection timeout while calling upstream service",
-        raw_line="raw log line",
+        file_path=Path("logs/app.log"),
+        line_number=20,
+        raw_line="2026-02-26T13:09:01+00:00 app: service restart initiated",
     )
 
-    rule = FilterRule(
-        rule_name="timeouts",
-        match_log_levels=["WARN", "ERROR"],
-        match_sources=None,
-        match_logger_name_contains=None,
-        match_message_contains=["timeout", "connection lost"],
-        include_context_before_seconds=5,
-        include_context_after_seconds=5,
+    config = ExtractionConfig(
+        include_keywords=[],
+        trigger_keywords=["restart"],
+        exclude_keywords=[],
+        duration_seconds=60,
     )
 
-    assert LogMatcher.matches_rule(entry, rule) is True
+    assert LogMatcher.is_trigger(entry, config) is True
+
+
+def test_is_excluded_when_line_contains_exclude_keyword() -> None:
+    entry = LogEntry(
+        timestamp=datetime(2026, 2, 26, 13, 9, 1),
+        file_path=Path("logs/app.log"),
+        line_number=30,
+        raw_line="2026-02-26T13:09:01+00:00 app: healthcheck passed",
+    )
+
+    config = ExtractionConfig(
+        include_keywords=[],
+        trigger_keywords=[],
+        exclude_keywords=["healthcheck"],
+        duration_seconds=0,
+    )
+
+    assert LogMatcher.is_excluded(entry, config) is True
