@@ -1,0 +1,6 @@
+{
+  "include_keywords": ["ERROR", "Exception"],
+  "trigger_keywords": ["payment failed"],
+  "exclude_keywords": ["healthcheck"],
+  "duration_seconds": 30
+}

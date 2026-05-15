@@ -1,50 +1,89 @@
-"""
-Provide the command-line entry point for the logextractor application.
-
-This module parses command-line arguments, resolves the selected configuration
-profile, and runs the extraction workflow.
-"""
-
 import argparse
 from datetime import datetime
 from pathlib import Path
 
 from logextractor.config.loader import ConfigLoader
 from logextractor.constants import DEFAULT_CONFIG_DIRECTORY, DEFAULT_CURRENT_YEAR
+from logextractor.domain.models import ExtractionConfig
 from logextractor.extraction.extractor import LogExtractor
 from logextractor.reporting.writer import ResultWriter
 
 
+LOGS_DIRECTORY = Path("logs")
+OUTPUT_DIRECTORY = Path("output")
+
+
 def build_parser() -> argparse.ArgumentParser:
-    """Create and return the argument parser used by the CLI."""
     parser = argparse.ArgumentParser(
         prog="logextractor",
-        description="Extract matching log entries from a log file using JSON rules.",
+        description="Extract matching log lines from all .log files in the logs directory.",
     )
-    parser.add_argument(
-        "-i",
-        "--input",
-        required=True,
-        help="Path to the input log file.",
-    )
+
     parser.add_argument(
         "-c",
         "--config",
-        required=True,
         help="Configuration file name or path.",
     )
+
+    parser.add_argument(
+        "-m",
+        "--manual",
+        action="store_true",
+        help="Use manual keyword arguments instead of a configuration file.",
+    )
+
+    parser.add_argument(
+        "--include",
+        nargs="*",
+        default=[],
+        help="Keywords for lines that should be included.",
+    )
+
+    parser.add_argument(
+        "--trigger",
+        nargs="*",
+        default=[],
+        help="Keywords for lines that should start a time window.",
+    )
+
+    parser.add_argument(
+        "--exclude",
+        nargs="*",
+        default=[],
+        help="Keywords for lines that should always be excluded.",
+    )
+
+    parser.add_argument(
+        "--duration",
+        type=int,
+        default=0,
+        help="Number of seconds to include after each trigger match.",
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Path to the output file.",
+    )
+
     parser.add_argument(
         "-y",
         "--year",
         type=int,
         default=DEFAULT_CURRENT_YEAR,
-        help="Year used when parsing syslog timestamps. Defaults to the current year.",
+        help="Year used when parsing syslog timestamps.",
     )
+
+    parser.add_argument(
+        "--print",
+        action="store_true",
+        help="Print matching lines to console instead of writing to file.",
+    )
+
     return parser
 
 
 def resolve_config_path(config_argument: str) -> Path:
-    """Resolve the configuration path from either a file name or an explicit path."""
     config_path = Path(config_argument)
 
     if config_path.is_absolute():
@@ -56,38 +95,104 @@ def resolve_config_path(config_argument: str) -> Path:
     return config_path
 
 
-def build_output_path(input_path: Path, config_path: Path, configured_output_path: str) -> Path:
-    """
-    Build the output file path using input file name, current time, and config file name.
+def resolve_input_paths() -> list[Path]:
+    if not LOGS_DIRECTORY.exists():
+        raise FileNotFoundError(f"Logs directory does not exist: {LOGS_DIRECTORY}")
 
-    The directory is taken from the configured output path. The file name is generated as:
-    <input-file-stem>_<HHMM>_<config-file-stem>.txt
-    """
-    output_directory = Path(configured_output_path).parent
-    timestamp = datetime.now().strftime("%H%M")
+    if not LOGS_DIRECTORY.is_dir():
+        raise NotADirectoryError(f"Logs path is not a directory: {LOGS_DIRECTORY}")
 
-    file_name = f"{input_path.stem}_{timestamp}_{config_path.stem}.txt"
-    return output_directory / file_name
+    paths = sorted(path for path in LOGS_DIRECTORY.iterdir() if path.is_file())
+
+    if not paths:
+        raise FileNotFoundError(f"No log files found in directory: {LOGS_DIRECTORY}")
+
+    invalid_paths = [path for path in paths if path.suffix != ".log"]
+
+    if invalid_paths:
+        invalid_files = ", ".join(str(path) for path in invalid_paths)
+        raise ValueError(f"Logs directory contains non-log files: {invalid_files}")
+
+    return paths
+
+
+def build_config(args: argparse.Namespace) -> ExtractionConfig:
+    if args.manual:
+        return ExtractionConfig(
+            include_keywords=args.include,
+            trigger_keywords=args.trigger,
+            exclude_keywords=args.exclude,
+            duration_seconds=args.duration,
+        )
+
+    if args.config is None:
+        raise ValueError("Either --manual or --config must be provided.")
+
+    return ConfigLoader.load(resolve_config_path(args.config))
+
+
+def build_output_path(input_paths: list[Path], output_argument: str | None) -> Path:
+    if output_argument:
+        return Path(output_argument)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if len(input_paths) == 1:
+        file_name = f"{input_paths[0].stem}_{timestamp}_filtered.txt"
+    else:
+        file_name = f"combined_{timestamp}_filtered.txt"
+
+    return OUTPUT_DIRECTORY / file_name
+
+
+def print_to_console(result) -> None:
+    current_file: Path | None = None
+
+    for line in result.matched_lines:
+        if line.file_path != current_file:
+            current_file = line.file_path
+            print()
+            print(f"File: {current_file}")
+            print("-" * 80)
+
+        print(f"[{line.reason}] line {line.line_number}: {line.raw_line}")
+
+    print()
+    print(f"Files read: {result.total_files_read}")
+    print(f"Lines read: {result.total_lines_read}")
+    print(f"Matched lines: {result.total_lines_matched}")
 
 
 def main() -> None:
-    """Run the CLI extraction workflow."""
     args = build_parser().parse_args()
 
-    input_path = Path(args.input)
-    config_path = resolve_config_path(args.config)
+    input_paths = resolve_input_paths()
+    config = build_config(args)
 
-    config = ConfigLoader.load(config_path)
     extractor = LogExtractor(year=args.year)
-    result = extractor.extract(input_path=input_path, config_path=config_path)
-
-    output_path = build_output_path(
-        input_path=input_path,
-        config_path=config_path,
-        configured_output_path=config.output_settings.output_file_path,
+    result = extractor.extract(
+        input_paths=input_paths,
+        config=config,
     )
 
-    ResultWriter.write(result=result, config=config, output_path=output_path)
+    if args.print:
+        print_to_console(result)
+        return
 
-    print(f"Matched entries: {result.total_lines_matched}")
+    output_path = build_output_path(
+        input_paths=input_paths,
+        output_argument=args.output,
+    )
+
+    ResultWriter.write(
+        result=result,
+        config=config,
+        output_path=output_path,
+    )
+
+    print(f"Matched lines: {result.total_lines_matched}")
     print(f"Output written to: {output_path}")
+
+
+if __name__ == "__main__":
+    main()

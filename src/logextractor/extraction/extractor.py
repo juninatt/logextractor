@@ -1,220 +1,134 @@
-"""
-Run the end-to-end log extraction workflow for a single input file.
-
-This module coordinates configuration loading, log parsing, rule matching,
-and result collection. It acts as the main extraction layer between the CLI
-and the lower-level parsing, filtering, and reporting components.
-"""
-
-import re
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 
-from logextractor.config.loader import ConfigLoader
 from logextractor.domain.models import (
+    ExtractionConfig,
     ExtractionResult,
-    FilterRule,
     LogEntry,
-    MatchTrigger,
-    MatchedSequence,
-    TimeRangeConfig,
+    MatchedLine,
+    TriggerWindow,
 )
 from logextractor.filtering.matcher import LogMatcher
 from logextractor.parsing.log_parser import LogParser
 
 
-@dataclass
-class _CandidateSequence:
-    """Represents a mutable time window before it is converted to a final sequence."""
-
-    start_timestamp: datetime
-    end_timestamp: datetime
-    triggers: list[MatchTrigger]
-
-
 class LogExtractor:
-    """Process a log file and collect entries that match configured rules."""
-
-    _SOURCE_IDENTIFIER_PATTERN = re.compile(
-        r"^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+(\S+)\s+"
-    )
 
     def __init__(self, year: int) -> None:
-        self._year = year
+        self._parser = LogParser(year=year)
 
-    def extract(self, input_path: Path, config_path: Path) -> ExtractionResult:
-        """
-        Extract matching log sequences from the given input file using the selected profile.
-        """
-        config = ConfigLoader.load(config_path)
-        parser = LogParser(year=self._year)
-
+    def extract(
+        self,
+        input_paths: list[Path],
+        config: ExtractionConfig,
+    ) -> ExtractionResult:
         total_lines_read = 0
-        total_lines_parsed = 0
-        total_lines_matched = 0
-        source_identifier: str | None = None
-        parsed_entries: list[LogEntry] = []
-        candidate_sequences: list[_CandidateSequence] = []
+        matched_lines: list[MatchedLine] = []
 
-        with input_path.open("r", encoding=config.input_settings.file_encoding) as file:
-            for line in file:
-                total_lines_read += 1
+        for input_path in input_paths:
+            entries, lines_read = self._read_entries(input_path)
+            total_lines_read += lines_read
 
-                if source_identifier is None:
-                    source_identifier = self._extract_source_identifier(line)
+            trigger_windows = self._build_trigger_windows(entries, config)
 
-                entry = parser.parse_line(line)
-                if entry is None:
+            for entry in entries:
+                if LogMatcher.is_excluded(entry, config):
                     continue
 
-                if not self._is_within_time_range(entry, config.time_range):
+                reason = self._get_match_reason(entry, config, trigger_windows)
+
+                if reason is None:
                     continue
 
-                total_lines_parsed += 1
-                parsed_entries.append(entry)
-
-                for rule in config.filtering.rules:
-                    if LogMatcher.matches_rule(entry, rule):
-                        total_lines_matched += 1
-                        candidate_sequences.append(
-                            self._create_candidate_sequence(entry=entry, rule=rule)
-                        )
-
-        merged_sequences = self._merge_overlapping_sequences(candidate_sequences)
-        final_sequences = self._build_final_sequences(
-            parsed_entries=parsed_entries,
-            merged_sequences=merged_sequences,
-        )
+                matched_lines.append(
+                    MatchedLine(
+                        file_path=entry.file_path,
+                        line_number=entry.line_number,
+                        timestamp=entry.timestamp,
+                        raw_line=entry.raw_line,
+                        reason=reason,
+                    )
+                )
 
         return ExtractionResult(
-            input_file=str(input_path),
-            source_identifier=source_identifier,
+            total_files_read=len(input_paths),
             total_lines_read=total_lines_read,
-            total_lines_parsed=total_lines_parsed,
-            total_lines_matched=total_lines_matched,
-            sequences=final_sequences,
+            total_lines_matched=len(matched_lines),
+            matched_lines=matched_lines,
         )
 
-    @classmethod
-    def _extract_source_identifier(cls, line: str) -> str | None:
-        """
-        Extract the source identifier from the common syslog prefix.
-        """
-        match = cls._SOURCE_IDENTIFIER_PATTERN.match(line)
-        if match is None:
-            return None
+    def _read_entries(self, input_path: Path) -> tuple[list[LogEntry], int]:
+        entries: list[LogEntry] = []
+        total_lines_read = 0
 
-        return match.group(1)
+        with input_path.open("r", encoding="utf-8") as file:
+            for line_number, line in enumerate(file, start=1):
+                total_lines_read += 1
 
-    @staticmethod
-    def _is_within_time_range(entry: LogEntry, time_range: TimeRangeConfig) -> bool:
-        """
-        Return True if the entry falls within the configured UTC time range.
-
-        The configured start and end times are interpreted as inclusive UTC
-        times in HH:MM:SS format.
-        """
-        if not time_range.enabled:
-            return True
-
-        entry_time = entry.timestamp.time()
-
-        start_time = (
-            datetime.strptime(time_range.start_time, "%H:%M:%S").time()
-            if time_range.start_time
-            else None
-        )
-        end_time = (
-            datetime.strptime(time_range.end_time, "%H:%M:%S").time()
-            if time_range.end_time
-            else None
-        )
-
-        if start_time and entry_time < start_time:
-            return False
-
-        if end_time and entry_time > end_time:
-            return False
-
-        return True
-
-    @staticmethod
-    def _create_candidate_sequence(
-        entry: LogEntry,
-        rule: FilterRule,
-    ) -> _CandidateSequence:
-        """
-        Create an initial sequence window around a matched entry using rule context settings.
-        """
-        return _CandidateSequence(
-            start_timestamp=entry.timestamp
-            - timedelta(seconds=rule.include_context_before_seconds),
-            end_timestamp=entry.timestamp
-            + timedelta(seconds=rule.include_context_after_seconds),
-            triggers=[
-                MatchTrigger(
-                    rule_name=rule.rule_name,
-                    timestamp=entry.timestamp,
-                    source=entry.source,
-                    logger=entry.logger,
-                    message=entry.message,
+                entry = self._parser.parse_line(
+                    line=line,
+                    file_path=input_path,
+                    line_number=line_number,
                 )
-            ],
-        )
+
+                if entry is not None:
+                    entries.append(entry)
+
+        return entries, total_lines_read
 
     @staticmethod
-    def _merge_overlapping_sequences(
-        sequences: list[_CandidateSequence],
-    ) -> list[_CandidateSequence]:
-        """
-        Merge overlapping candidate sequences into larger chronological windows.
-        """
-        if not sequences:
-            return []
+    def _build_trigger_windows(
+        entries: list[LogEntry],
+        config: ExtractionConfig,
+    ) -> list[TriggerWindow]:
+        trigger_windows: list[TriggerWindow] = []
 
-        sorted_sequences = sorted(
-            sequences,
-            key=lambda sequence: sequence.start_timestamp,
-        )
-        merged: list[_CandidateSequence] = [sorted_sequences[0]]
+        for entry in entries:
+            if LogMatcher.is_excluded(entry, config):
+                continue
 
-        for current in sorted_sequences[1:]:
-            previous = merged[-1]
+            if not LogMatcher.is_trigger(entry, config):
+                continue
 
-            if current.start_timestamp <= previous.end_timestamp:
-                previous.end_timestamp = max(previous.end_timestamp, current.end_timestamp)
-                previous.triggers.extend(current.triggers)
-                previous.triggers.sort(key=lambda trigger: trigger.timestamp)
-            else:
-                merged.append(current)
-
-        return merged
-
-    @staticmethod
-    def _build_final_sequences(
-        parsed_entries: list[LogEntry],
-        merged_sequences: list[_CandidateSequence],
-    ) -> list[MatchedSequence]:
-        """
-        Convert merged candidate windows into final matched sequences with entries.
-        """
-        final_sequences: list[MatchedSequence] = []
-
-        for sequence in merged_sequences:
-            entries = [
-                entry
-                for entry in parsed_entries
-                if sequence.start_timestamp <= entry.timestamp <= sequence.end_timestamp
-            ]
-
-            final_sequences.append(
-                MatchedSequence(
-                    start_timestamp=sequence.start_timestamp,
-                    end_timestamp=sequence.end_timestamp,
-                    triggers=sequence.triggers,
-                    entries=entries,
+            trigger_windows.append(
+                TriggerWindow(
+                    file_path=entry.file_path,
+                    start_timestamp=entry.timestamp,
+                    end_timestamp=entry.timestamp
+                    + timedelta(seconds=config.duration_seconds),
+                    trigger_line=entry.raw_line,
                 )
             )
 
-        return final_sequences
+        return trigger_windows
+
+    @staticmethod
+    def _get_match_reason(
+        entry: LogEntry,
+        config: ExtractionConfig,
+        trigger_windows: list[TriggerWindow],
+    ) -> str | None:
+        if LogMatcher.is_trigger(entry, config):
+            return "trigger"
+
+        if LogMatcher.is_included(entry, config):
+            return "include"
+
+        if LogExtractor._is_inside_trigger_window(entry, trigger_windows):
+            return "window"
+
+        return None
+
+    @staticmethod
+    def _is_inside_trigger_window(
+        entry: LogEntry,
+        trigger_windows: list[TriggerWindow],
+    ) -> bool:
+        for window in trigger_windows:
+            if entry.file_path != window.file_path:
+                continue
+
+            if window.start_timestamp <= entry.timestamp <= window.end_timestamp:
+                return True
+
+        return False

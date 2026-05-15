@@ -1,38 +1,18 @@
-"""
-Parse supported log formats into structured LogEntry objects.
-
-This module converts raw log lines into typed log entries that can be used by
-the filtering and extraction pipeline. It currently supports syslog-style lines
-with optional embedded application log formats.
-"""
-
 import re
 from datetime import datetime
-from typing import Optional
+from pathlib import Path
 
 from logextractor.domain.models import LogEntry
 
 
-SYSLOG_PATTERN = re.compile(
+ISO_TIMESTAMP_PATTERN = re.compile(
+    r"^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2}))"
+)
+
+SYSLOG_TIMESTAMP_PATTERN = re.compile(
     r"^(?P<month>[A-Z][a-z]{2})\s+"
     r"(?P<day>\d{1,2})\s+"
-    r"(?P<time>\d{2}:\d{2}:\d{2})\s+"
-    r"(?P<host>\S+)\s+"
-    r"(?P<source>[^\[:]+)(?:\[(?P<pid>\d+)])?:\s*"
-    r"(?P<content>.*)$"
-)
-
-APP_LOG_PATTERN = re.compile(
-    r"^(?P<app_time>\d{2}:\d{2}:\d{2}[.,]\d{3})\s+"
-    r"\[(?P<thread>[^\]]+)]\s+"
-    r"(?P<level>TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s+"
-    r"(?P<logger>.+?)\s+-\s+"
-    r"(?P<message>.*)$"
-)
-
-LOGBACK_PATTERN = re.compile(
-    r"^(?P<app_time>\d{2}:\d{2}:\d{2}[.,]\d{3})\s+\|-(?P<level>TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s+in\s+"
-    r"(?P<message>.*)$"
+    r"(?P<time>\d{2}:\d{2}:\d{2})"
 )
 
 MONTHS = {
@@ -52,81 +32,62 @@ MONTHS = {
 
 
 class LogParser:
-    """
-    Parse raw log lines into structured LogEntry objects.
-    """
 
     def __init__(self, year: int) -> None:
         self._year = year
 
-    def parse_line(self, line: str) -> Optional[LogEntry]:
-        """
-        Parse a raw log line into a LogEntry instance.
-
-        Returns None if the line does not match the supported syslog-based
-        format. If only the outer syslog structure is recognized, the entry
-        is still returned with level set to UNKNOWN.
-        """
+    def parse_line(
+        self,
+        line: str,
+        file_path: Path,
+        line_number: int,
+    ) -> LogEntry | None:
         raw_line = line.rstrip("\n")
 
-        syslog_match = SYSLOG_PATTERN.match(raw_line)
-        if not syslog_match:
+        timestamp = self._parse_iso_timestamp(raw_line)
+
+        if timestamp is None:
+            timestamp = self._parse_syslog_timestamp(raw_line)
+
+        if timestamp is None:
             return None
-
-        timestamp = self._parse_syslog_timestamp(
-            month=syslog_match.group("month"),
-            day=syslog_match.group("day"),
-            time_value=syslog_match.group("time"),
-        )
-
-        source = syslog_match.group("source")
-        content = syslog_match.group("content")
-
-        app_match = APP_LOG_PATTERN.match(content)
-        if app_match:
-            return LogEntry(
-                timestamp=timestamp,
-                level=app_match.group("level"),
-                source=source,
-                logger=app_match.group("logger"),
-                message=app_match.group("message"),
-                raw_line=raw_line,
-            )
-
-        logback_match = LOGBACK_PATTERN.match(content)
-        if logback_match:
-            return LogEntry(
-                timestamp=timestamp,
-                level=logback_match.group("level"),
-                source=source,
-                logger=None,
-                message=logback_match.group("message"),
-                raw_line=raw_line,
-            )
 
         return LogEntry(
             timestamp=timestamp,
-            level="UNKNOWN",
-            source=source,
-            logger=None,
-            message=content,
+            file_path=file_path,
+            line_number=line_number,
             raw_line=raw_line,
         )
 
-    def _parse_syslog_timestamp(self, month: str, day: str, time_value: str) -> datetime:
-        """
-        Convert syslog date components into a datetime instance.
+    def _parse_iso_timestamp(self, raw_line: str) -> datetime | None:
+        match = ISO_TIMESTAMP_PATTERN.match(raw_line)
 
-        Syslog timestamps do not include the year, so the parser uses the year
-        provided when the LogParser instance is created.
-        """
-        month_number = MONTHS[month]
-        hour, minute, second = map(int, time_value.split(":"))
+        if match is None:
+            return None
+
+        timestamp_value = match.group("timestamp")
+
+        if timestamp_value.endswith("Z"):
+            timestamp_value = timestamp_value.replace("Z", "+00:00")
+
+        if re.search(r"[+-]\d{4}$", timestamp_value):
+            timestamp_value = f"{timestamp_value[:-2]}:{timestamp_value[-2:]}"
+
+        return datetime.fromisoformat(timestamp_value)
+
+    def _parse_syslog_timestamp(self, raw_line: str) -> datetime | None:
+        match = SYSLOG_TIMESTAMP_PATTERN.match(raw_line)
+
+        if match is None:
+            return None
+
+        month_number = MONTHS[match.group("month")]
+        hour, minute, second = map(int, match.group("time").split(":"))
 
         return datetime(
             year=self._year,
             month=month_number,
-            day=int(day),
+            day=int(match.group("day")),
             hour=hour,
             minute=minute,
             second=second,

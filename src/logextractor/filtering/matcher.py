@@ -1,54 +1,31 @@
-"""
-Evaluate parsed log entries against filtering rules.
+import re
 
-This module contains the rule matching logic used during log extraction.
-It determines whether a log entry matches a rule.
-"""
-
-from logextractor.domain.models import FilterRule, LogEntry
+from logextractor.domain.models import ExtractionConfig, LogEntry
 
 
 class LogMatcher:
-    """
-    Apply filtering rules to parsed log entries.
-    """
 
     @staticmethod
-    def matches_rule(entry: LogEntry, rule: FilterRule) -> bool:
-        """
-        Return True if the log entry satisfies the given rule.
-
-        Each rule field is optional. If a rule field is not defined, it does
-        not restrict the match condition.
-        """
-        if rule.match_log_levels and entry.level not in rule.match_log_levels:
-            return False
-
-        if rule.match_sources and (
-            entry.source is None or entry.source not in rule.match_sources
-        ):
-            return False
-
-        if rule.match_logger_name_contains and not LogMatcher._contains_any(
-            entry.logger,
-            rule.match_logger_name_contains,
-        ):
-            return False
-
-        if rule.match_message_contains and not LogMatcher._contains_any(
-            entry.message,
-            rule.match_message_contains,
-        ):
-            return False
-
-        return True
+    def is_excluded(entry: LogEntry, config: ExtractionConfig) -> bool:
+        return LogMatcher._contains_any_keyword(entry.raw_line, config.exclude_keywords)
 
     @staticmethod
-    def _contains_any(value: str | None, expected_fragments: list[str]) -> bool:
-        """
-        Return True if the value contains any of the specified fragments.
-        """
-        if value is None:
-            return False
+    def is_included(entry: LogEntry, config: ExtractionConfig) -> bool:
+        return LogMatcher._contains_any_keyword(entry.raw_line, config.include_keywords)
 
-        return any(fragment in value for fragment in expected_fragments)
+    @staticmethod
+    def is_trigger(entry: LogEntry, config: ExtractionConfig) -> bool:
+        return LogMatcher._contains_any_keyword(entry.raw_line, config.trigger_keywords)
+
+    @staticmethod
+    def _contains_any_keyword(value: str, keywords: list[str]) -> bool:
+        return any(
+            LogMatcher._contains_keyword(value, keyword)
+            for keyword in keywords
+            if keyword
+        )
+
+    @staticmethod
+    def _contains_keyword(value: str, keyword: str) -> bool:
+        pattern = rf"(?<![A-Za-z0-9_]){re.escape(keyword)}(?![A-Za-z0-9_])"
+        return re.search(pattern, value) is not None
